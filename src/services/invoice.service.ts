@@ -79,7 +79,7 @@ export const invoiceService = {
     return { data, error }
   },
 
-  async updateInvoiceStatus(invoiceId: string, status: string) {
+  async updateInvoiceStatus(invoiceId: string, status: 'paid' | 'unpaid' | 'overdue' | 'sent' | 'draft') {
     return await this.updateInvoice(invoiceId, { 
       status,
       updated_at: new Date().toISOString()

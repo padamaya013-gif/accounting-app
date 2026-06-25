@@ -1,169 +1,130 @@
 'use client'
 
-import { useState, useEffect } from 'react'
-import { Plus, Download, Eye, Edit, Trash2, Filter } from 'lucide-react'
-import Link from 'next/link'
-import DataTable from '@/components/Table/DataTable'
+import { useEffect, useState } from 'react'
 import { supabase } from '@/lib/supabase'
 import { formatRupiah, formatDate } from '@/utils/formatters'
 
+interface Invoice {
+  id: string
+  invoice_number: string
+  client_name: string
+  client_email: string
+  amount: number
+  status: string
+  created_at: string
+  due_date: string
+}
+
 export default function InvoicesPage() {
-  const [invoices, setInvoices] = useState([])
+  const [invoices, setInvoices] = useState<Invoice[]>([])
   const [loading, setLoading] = useState(true)
-  const [filterStatus, setFilterStatus] = useState<string>('all')
+  const [error, setError] = useState<string | null>(null)
 
   useEffect(() => {
-    loadInvoices()
-  }, [filterStatus])
+    const fetchInvoices = async () => {
+      try {
+        setLoading(true)
+        setError(null)
 
-  const loadInvoices = async () => {
-    setLoading(true)
-    try {
-      const companyId = localStorage.getItem('selected_company_id') || 'e1234567-1234-1234-1234-123456789001'
-      
-      let query = supabase
-        .from('invoices')
-        .select('*')
-        .eq('company_id', companyId)
+        const { data, error: err } = await supabase
+          .from('invoices')
+          .select('*')
+          .order('created_at', { ascending: false })
 
-      if (filterStatus !== 'all') {
-        query = query.eq('status', filterStatus)
+        if (err) throw err
+        setInvoices(data || [])
+      } catch (error) {
+        console.error('Failed to load invoices:', error)
+        setError('Gagal memuat invoices')
+      } finally {
+        setLoading(false)
       }
-
-      const { data, error } = await query.order('created_at', { ascending: false })
-
-      if (error) throw error
-      setInvoices(data || [])
-    } catch (error) {
-      console.error('Failed to load invoices:', error)
-    } finally {
-      setLoading(false)
     }
-  }
 
-  const columns = [
-    {
-      key: 'invoice_number',
-      label: 'No. Invoice',
-      width: '120px',
-    },
-    {
-      key: 'client_name',
-      label: 'Klien',
-      width: '180px',
-    },
-    {
-      key: 'invoice_date',
-      label: 'Tanggal',
-      render: (date: string) => formatDate(date),
-    },
-    {
-      key: 'total',
-      label: 'Total',
-      render: (total: number) => formatRupiah(total),
-    },
-    {
-      key: 'status',
-      label: 'Status',
-      render: (status: string) => (
-        <span
-          className={`px-3 py-1 rounded-full text-xs font-medium badge ${
-            status === 'paid'
-              ? 'badge-success'
-              : status === 'unpaid'
-              ? 'badge-warning'
-              : 'badge-danger'
-          }`}
-        >
-          {status === 'paid' ? 'Dibayar' : status === 'unpaid' ? 'Belum Dibayar' : 'Lewat Jatuh Tempo'}
-        </span>
-      ),
-    },
-    {
-      key: 'actions',
-      label: 'Aksi',
-      width: '120px',
-      render: (_, row) => (
-        <div className="flex gap-2">
-          <Link href={`/dashboard/invoices/${row.id}`}>
-            <button className="p-1 text-gray-600 hover:bg-gray-100 rounded transition-colors" title="Lihat">
-              <Eye className="w-4 h-4" />
-            </button>
-          </Link>
-          <button className="p-1 text-blue-600 hover:bg-blue-50 rounded transition-colors" title="Edit">
-            <Edit className="w-4 h-4" />
-          </button>
-          <button className="p-1 text-red-600 hover:bg-red-50 rounded transition-colors" title="Hapus">
-            <Trash2 className="w-4 h-4" />
-          </button>
-        </div>
-      ),
-    },
-  ]
-
-  const paidCount = invoices.filter((i: any) => i.status === 'paid').length
-  const unpaidCount = invoices.filter((i: any) => i.status !== 'paid').length
+    fetchInvoices()
+  }, [])
 
   return (
-    <div className="p-8 space-y-8">
-      {/* Header */}
-      <div className="flex justify-between items-start">
-        <div>
-          <h1 className="text-3xl font-bold text-gray-900">Invoice</h1>
-          <p className="text-gray-600 mt-1">Kelola semua invoice penjualan</p>
-        </div>
-        <Link href="/dashboard/invoices/new">
-          <button className="bg-blue-600 text-white px-6 py-2.5 rounded-lg hover:bg-blue-700 flex items-center gap-2 transition-colors shadow-md">
-            <Plus className="w-5 h-5" />
-            Invoice Baru
-          </button>
-        </Link>
+    <div className="space-y-6">
+      <div className="flex justify-between items-center">
+        <h1 className="text-3xl font-bold">Invoices</h1>
+        <a
+          href="/dashboard/invoices/new"
+          className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700"
+        >
+          + Buat Invoice
+        </a>
       </div>
 
-      {/* Filters */}
-      <div className="bg-white rounded-lg shadow p-4 flex items-center gap-4">
-        <Filter className="w-5 h-5 text-gray-600" />
-        <div className="flex gap-2 flex-wrap">
-          {['all', 'paid', 'unpaid', 'overdue'].map((status) => (
-            <button
-              key={status}
-              onClick={() => setFilterStatus(status)}
-              className={`px-4 py-2 rounded-lg font-medium transition-colors ${
-                filterStatus === status
-                  ? 'bg-blue-600 text-white'
-                  : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
-              }`}
-            >
-              {status === 'all'
-                ? 'Semua'
-                : status === 'paid'
-                ? 'Dibayar'
-                : status === 'unpaid'
-                ? 'Belum Dibayar'
-                : 'Lewat Jatuh Tempo'}
-            </button>
-          ))}
+      {error && (
+        <div className="p-4 bg-red-50 border border-red-200 rounded-lg text-red-700">
+          {error}
         </div>
-      </div>
+      )}
 
-      {/* Table */}
-      <DataTable columns={columns} data={invoices} loading={loading} />
-
-      {/* Summary */}
-      <div className="grid grid-cols-3 gap-4">
-        <div className="bg-white rounded-lg shadow p-4 border-l-4 border-blue-500">
-          <p className="text-sm text-gray-600">Total Invoice</p>
-          <p className="text-2xl font-bold text-gray-900 mt-1">{invoices.length}</p>
+      {loading ? (
+        <div className="flex justify-center py-12">
+          <div className="text-gray-600">Loading...</div>
         </div>
-        <div className="bg-white rounded-lg shadow p-4 border-l-4 border-yellow-500">
-          <p className="text-sm text-gray-600">Belum Dibayar</p>
-          <p className="text-2xl font-bold text-yellow-600 mt-1">{unpaidCount}</p>
+      ) : invoices.length === 0 ? (
+        <div className="bg-white rounded-lg shadow p-8 text-center">
+          <p className="text-gray-600">Belum ada invoice</p>
         </div>
-        <div className="bg-white rounded-lg shadow p-4 border-l-4 border-green-500">
-          <p className="text-sm text-gray-600">Sudah Dibayar</p>
-          <p className="text-2xl font-bold text-green-600 mt-1">{paidCount}</p>
+      ) : (
+        <div className="bg-white rounded-lg shadow overflow-hidden">
+          <table className="w-full">
+            <thead className="bg-gray-50 border-b">
+              <tr>
+                <th className="px-6 py-3 text-left text-sm font-semibold text-gray-900">No. Invoice</th>
+                <th className="px-6 py-3 text-left text-sm font-semibold text-gray-900">Klien</th>
+                <th className="px-6 py-3 text-left text-sm font-semibold text-gray-900">Jumlah</th>
+                <th className="px-6 py-3 text-left text-sm font-semibold text-gray-900">Tgl Invoice</th>
+                <th className="px-6 py-3 text-left text-sm font-semibold text-gray-900">Jatuh Tempo</th>
+                <th className="px-6 py-3 text-left text-sm font-semibold text-gray-900">Status</th>
+                <th className="px-6 py-3 text-left text-sm font-semibold text-gray-900">Aksi</th>
+              </tr>
+            </thead>
+            <tbody>
+              {invoices.map((invoice) => (
+                <tr key={invoice.id} className="border-b hover:bg-gray-50 transition">
+                  <td className="px-6 py-4 text-sm font-medium text-gray-900">{invoice.invoice_number}</td>
+                  <td className="px-6 py-4 text-sm">
+                    <div className="text-gray-900">{invoice.client_name}</div>
+                    <div className="text-xs text-gray-500">{invoice.client_email}</div>
+                  </td>
+                  <td className="px-6 py-4 text-sm font-semibold text-gray-900">{formatRupiah(invoice.amount)}</td>
+                  <td className="px-6 py-4 text-sm text-gray-600">{formatDate(invoice.created_at)}</td>
+                  <td className="px-6 py-4 text-sm text-gray-600">{formatDate(invoice.due_date)}</td>
+                  <td className="px-6 py-4 text-sm">
+                    <span
+                      className={`px-3 py-1 rounded-full text-xs font-medium ${
+                        invoice.status === 'paid'
+                          ? 'bg-green-100 text-green-800'
+                          : invoice.status === 'pending'
+                          ? 'bg-yellow-100 text-yellow-800'
+                          : 'bg-red-100 text-red-800'
+                      }`}
+                    >
+                      {invoice.status}
+                    </span>
+                  </td>
+                  <td className="px-6 py-4 text-sm">
+                    <div className="flex gap-2">
+                      <a
+                        href={`/dashboard/invoices/${invoice.id}`}
+                        className="text-blue-600 hover:underline"
+                      >
+                        Lihat
+                      </a>
+                      <button className="text-red-600 hover:underline">Hapus</button>
+                    </div>
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
         </div>
-      </div>
+      )}
     </div>
   )
 }
